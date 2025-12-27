@@ -57,18 +57,38 @@ def fetch_screener(url):
         "csrftoken": csrftoken
     }
 
-    r = requests.get(url, headers=headers, cookies=cookies, timeout=15)
+    all_dfs = []
+    page = 1
 
-    if r.status_code != 200:
+    while True:
+        paged_url = f"{url}&page={page}"
+        r = requests.get(paged_url, headers=headers, cookies=cookies, timeout=15)
+
+        if r.status_code != 200:
+            break
+
+        soup = BeautifulSoup(r.text, "lxml")
+        table = soup.find("table")
+
+        if table is None:
+            break  # no more pages
+
+        df = pd.read_html(str(table))[0]
+
+        if df.empty:
+            break
+
+        all_dfs.append(df)
+        page += 1
+
+    if not all_dfs:
         return None
 
-    soup = BeautifulSoup(r.text, "lxml")
-    table = soup.find("table")
+    final_df = pd.concat(all_dfs, ignore_index=True)
+    final_df = final_df.drop_duplicates()
 
-    if table is None:
-        return None
+    return final_df
 
-    return pd.read_html(str(table))[0]
 
 # ================= RUN =================
 if run:
